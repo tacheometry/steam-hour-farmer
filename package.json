@@ -1,0 +1,31 @@
+{
+	"name": "steam-hour-farmer",
+	"version": "1.0.0",
+	"description": "Farm hours headlessly on Steam without game installation",
+	"main": "index.js",
+	"bin": {
+		"steam-hour-farmer": "./index.js"
+	},
+	"scripts": {
+		"start": "node index.js"
+	},
+	"repository": "github:tacheometry/steam-hour-farmer",
+	"keywords": [
+		"steam"
+	],
+	"author": "tacheometry",
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/steam-hour-farmer/issues"
+	},
+	"homepage": "https://github.com/tacheometry/steam-hour-farmer#readme",
+	"dependencies": {
+		"dotenv": "^16.0.3",
+		"steam-totp": "^2.1.2",
+		"steam-user": "^4.25.0"
+	},
+	"devDependencies": {
+		"@types/steam-totp": "^2.1.0",
+		"@types/steam-user": "^4.23.2"
+	}
+}
