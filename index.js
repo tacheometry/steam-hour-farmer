@@ -45,7 +45,21 @@ const User = new Steam({
 	dataDirectory: "SteamData",
 });
 
+let playingOnOtherSession = false;
+let currentNotification;
+let authenticated = false;
+let MIN_REQUEST_TIME = 60 * 1000;
+let LOG_ON_INTERVAL = 10 * 60 * 1000;
+let REFRESH_GAMES_INTERVAL = 5 * 60 * 1000;
+let lastGameRefreshTime = new Date(0);
+let lastLogOnTime = new Date(0);
+let onlyLogInAfter = new Date(0);
+
 const logOn = () => {
+	if (authenticated) return;
+	if (Date.now() - lastLogOnTime <= MIN_REQUEST_TIME) return;
+	if (Date.now() < onlyLogInAfter) return;
+	console.log("Logging in...");
 	User.logOn({
 		accountName: USERNAME,
 		password: PASSWORD,
@@ -56,6 +70,7 @@ const logOn = () => {
 			: undefined,
 		autoRelogin: true,
 	});
+	lastLogOnTime = Date.now();
 };
 
 const panic = (message = "Exiting...") => {
@@ -63,15 +78,16 @@ const panic = (message = "Exiting...") => {
 	process.exit(1);
 };
 
-let playingOnOtherSession = false;
-let currentNotification;
 const refreshGames = () => {
+	if (!authenticated) return;
 	let notification;
 	if (playingOnOtherSession) {
 		notification = "Farming is paused.";
 	} else {
+		if (Date.now() - lastGameRefreshTime <= MIN_REQUEST_TIME) return;
 		User.gamesPlayed(SHOULD_PLAY);
 		notification = "Farming...";
+		lastGameRefreshTime = Date.now();
 	}
 	if (currentNotification !== notification) {
 		currentNotification = notification;
@@ -95,22 +111,36 @@ User.on("playingState", (blocked, app) => {
 });
 
 User.on("loggedOn", () => {
+	authenticated = true;
 	console.log(`Successfully logged in to Steam with ID ${User.steamID}`);
 	if (PERSONA !== undefined) User.setPersona(PERSONA);
-
-	// Allow time to receive the playingState event to see if playing on another session if that's the case
-	setTimeout(refreshGames, 5000);
+	refreshGames();
 });
 
 User.on("error", (e) => {
-	if (e.eresult === Steam.EResult.LoggedInElsewhere) {
-		console.log("Got kicked by other Steam session. Logging in again...");
-		logOn();
-		return;
+	switch (e.eresult) {
+		case Steam.EResult.LoggedInElsewhere: {
+			authenticated = false;
+			console.log(
+				"Got kicked by other Steam session. Will log in shortly..."
+			);
+			logOn();
+			return;
+		}
+		case Steam.EResult.RateLimitExceeded: {
+			authenticated = false;
+			onlyLogInAfter = Date.now() + 31 * 60 * 1000;
+			console.log(
+				"Got rate limited by Steam. Will try logging in again in 30 minutes."
+			);
+			return;
+		}
+		default: {
+			panic(`Got an error from Steam: "${e.message}".`);
+		}
 	}
-	panic(`Got an error from Steam: "${e.message}".`);
 });
 
 logOn();
-
-setInterval(refreshGames, 20 * 1000);
+setInterval(logOn, LOG_ON_INTERVAL);
+setInterval(refreshGames, REFRESH_GAMES_INTERVAL);
