@@ -21,8 +21,8 @@ _`steam-hour-farmer` is a program that emulates you playing a game on Steam, wit
 5. In this directory, make an `.env` file with the content:
 
     ```sh
-    USERNAME="your_steam_username",
-    PASSWORD="your_steam_password",
+    USERNAME="your_steam_username"
+    PASSWORD="your_steam_password"
     GAMES="440,4000"
     ```
 
