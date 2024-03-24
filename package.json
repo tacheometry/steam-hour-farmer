@@ -6,6 +6,9 @@
 	"bin": {
 		"steam-hour-farmer": "./index.js"
 	},
+	"engines": {
+		"node": ">=16.0.0"
+	},
 	"scripts": {
 		"start": "node index.js"
 	},
