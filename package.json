@@ -1,6 +1,6 @@
 {
 	"name": "steam-hour-farmer",
-	"version": "2.0.0",
+	"version": "2.0.1",
 	"description": "Farm hours headlessly on Steam without game installation",
 	"main": "index.js",
 	"bin": {
