@@ -9,7 +9,7 @@ const TOTP = require("steam-totp");
 console.log(`Documentation: https://github.com/tacheometry/steam-hour-farmer`);
 
 require("dotenv").config();
-let { USERNAME, PASSWORD, PERSONA, GAMES, SHARED_SECRET } = process.env;
+let { ACCOUNT_NAME, PASSWORD, PERSONA, GAMES, SHARED_SECRET } = process.env;
 {
 	PERSONA = parseInt(PERSONA);
 	const shouldExist = (name) => {
@@ -21,7 +21,7 @@ let { USERNAME, PASSWORD, PERSONA, GAMES, SHARED_SECRET } = process.env;
 		}
 	};
 
-	shouldExist("USERNAME");
+	shouldExist("ACCOUNT_NAME");
 	shouldExist("PASSWORD");
 	shouldExist("GAMES");
 }
@@ -40,9 +40,10 @@ const consoleQuestion = util
 
 const getTOTP = () => TOTP.generateAuthCode(SHARED_SECRET);
 
-const User = new Steam({
+const user = new Steam({
 	machineIdType: Steam.EMachineIDType.PersistentRandom,
 	dataDirectory: "SteamData",
+	renewRefreshTokens: true,
 });
 
 let playingOnOtherSession = false;
@@ -60,10 +61,10 @@ const logOn = () => {
 	if (Date.now() - lastLogOnTime <= MIN_REQUEST_TIME) return;
 	if (Date.now() < onlyLogInAfter) return;
 	console.log("Logging in...");
-	User.logOn({
-		accountName: USERNAME,
+	user.logOn({
+		accountName: ACCOUNT_NAME,
 		password: PASSWORD,
-		rememberPassword: true,
+		machineName: "steam-hour-farmer",
 		clientOS: Steam.EOSType.Windows10,
 		twoFactorCode: SHARED_SECRET
 			? TOTP.generateAuthCode(SHARED_SECRET)
@@ -85,7 +86,7 @@ const refreshGames = () => {
 		notification = "Farming is paused.";
 	} else {
 		if (Date.now() - lastGameRefreshTime <= MIN_REQUEST_TIME) return;
-		User.gamesPlayed(SHOULD_PLAY);
+		user.gamesPlayed(SHOULD_PLAY);
 		notification = "Farming...";
 		lastGameRefreshTime = Date.now();
 	}
@@ -95,7 +96,7 @@ const refreshGames = () => {
 	}
 };
 
-User.on("steamGuard", async (domain, callback) => {
+user.on("steamGuard", async (domain, callback) => {
 	if (SHARED_SECRET) return callback(getTOTP());
 	const manualCode = await consoleQuestion(
 		`Enter Steam Guard code` +
@@ -105,19 +106,19 @@ User.on("steamGuard", async (domain, callback) => {
 	callback(manualCode);
 });
 
-User.on("playingState", (blocked, app) => {
+user.on("playingState", (blocked, app) => {
 	playingOnOtherSession = blocked;
 	refreshGames();
 });
 
-User.on("loggedOn", () => {
+user.on("loggedOn", () => {
 	authenticated = true;
-	console.log(`Successfully logged in to Steam with ID ${User.steamID}`);
-	if (PERSONA !== undefined) User.setPersona(PERSONA);
+	console.log(`Successfully logged in to Steam with ID ${user.steamID}`);
+	if (PERSONA !== undefined) user.setPersona(PERSONA);
 	refreshGames();
 });
 
-User.on("error", (e) => {
+user.on("error", (e) => {
 	switch (e.eresult) {
 		case Steam.EResult.LoggedInElsewhere: {
 			authenticated = false;

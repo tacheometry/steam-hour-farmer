@@ -21,7 +21,7 @@ _`steam-hour-farmer` is a program that emulates you playing a game on Steam, wit
 5. In this directory, make an `.env` file with the content:
 
     ```sh
-    USERNAME="your_steam_username"
+    ACCOUNT_NAME="your_steam_username"
     PASSWORD="your_steam_password"
     GAMES="440,4000"
     ```
@@ -38,8 +38,6 @@ _`steam-hour-farmer` is a program that emulates you playing a game on Steam, wit
 
     to be Online. Do not write this value if you don't want the user's presence to change.
 
-    If you have access to your Steam Shared Secret, you can input it into a `SHARED_SECRET` variable. This will prevent you from needing to input your Steam Guard code at all.
-
     All of this configuration can be passed via environment variables too - they don't need to be in this `.env` file.
 
 6. Run the program in the same directory:
@@ -47,6 +45,15 @@ _`steam-hour-farmer` is a program that emulates you playing a game on Steam, wit
     ```
     steam-hour-farmer
     ```
+
+> [!TIP]
+> If you have access to your Steam Shared Secret (using something like [SteamDesktopAuthenticator](https://github.com/Jessecar96/SteamDesktopAuthenticator)), you can input it into a `SHARED_SECRET` variable like so:
+>
+> ```sh
+> SHARED_SECRET="xxxxxxxxxx"
+> ```
+>
+> This will prevent you from needing to input your Steam Guard code at all, and will allow the bot to reconnect without any manual intervention.
 
 When the bot starts, it will request a Steam Guard code via email or the mobile application. When you start playing on another machine, the bot will be kicked from its session, requiring a re-login, with a new Steam Guard code.
 
