@@ -60,3 +60,11 @@ When the bot starts, it will request a Steam Guard code via email or the mobile 
 This can be remedied by using the Steam Shared Secret, or disabling Steam Guard.
 
 Note that the playtime might seem to be the same when looking from another client - it can take a couple hours for Steam to refresh it sometimes.
+
+### Running in the background
+
+To run the program in the background, multiple methods can be followed. These include:
+
+-   Using [PM2](https://pm2.keymetrics.io/) (this is what I use)
+-   Creating a Systemd service
+-   Using [GNU Screen](https://wiki.archlinux.org/title/GNU_Screen) 
