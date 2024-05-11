@@ -28,7 +28,11 @@ _`steam-hour-farmer` is a program that emulates you playing a game on Steam, wit
 
     This will start playing Team Fortress 2 and Garry's Mod for example.
 
-    The `GAMES` part of the file describes what games you'd like the bot to play, separated by a comma.
+    The `GAMES` part of the file describes what games you'd like the bot to play, separated by a comma. You can also include a non-Steam game name, for example:
+
+    ```sh
+    GAMES="Hello World,440,400"
+    ```
 
     Additionally, a `PERSONA` value may be supplied to set the online status of the user. Can be Online (1), Busy (2), Away (3), Snooze (4). For example,
 
@@ -67,4 +71,4 @@ To run the program in the background, multiple methods can be followed. These in
 
 -   Using [PM2](https://pm2.keymetrics.io/) (this is what I use)
 -   Creating a Systemd service
--   Using [GNU Screen](https://wiki.archlinux.org/title/GNU_Screen) 
+-   Using [GNU Screen](https://wiki.archlinux.org/title/GNU_Screen)
