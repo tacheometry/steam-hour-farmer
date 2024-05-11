@@ -26,7 +26,12 @@ let { ACCOUNT_NAME, PASSWORD, PERSONA, GAMES, SHARED_SECRET } = process.env;
 	shouldExist("GAMES");
 }
 
-const SHOULD_PLAY = GAMES.split(",").map((n) => parseInt(n));
+const SHOULD_PLAY = GAMES.split(",").map((game) => {
+	const asNumber = parseInt(game);
+	// NaN
+	if (asNumber !== asNumber) return game;
+	return asNumber;
+});
 if (SHOULD_PLAY.length === 0)
 	console.warn("Could not find any games to play. Maybe this is a mistake?");
 
