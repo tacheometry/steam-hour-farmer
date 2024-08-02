@@ -18,7 +18,7 @@ _`steam-hour-farmer` is a program that emulates you playing a game on Steam, wit
     ```
 3. Make a directory somewhere. This is where your Steam data will be stored, and where you can configure the bot.
 4. Find your Steam game ids. In each game, go to Properties -> Updates -> Copy the App ID.
-5. In this directory, make an `.env` file with the content:
+5. In this directory, make a file named `.env` with the content:
 
     ```sh
     ACCOUNT_NAME="your_steam_username"
