@@ -1,22 +1,20 @@
-## 🚀 Simple Steam Hour Farmer
+## Simple Steam Hour Farmer
 
 _`steam-hour-farmer` is a program designed to emulate gameplay on Steam, allowing you to effortlessly accumulate playtime on specific games in your profile._
-
-### 🌟 Key Features
 
 - **24/7 Deployment**: Can be easily deployed on a VPS for continuous operation.
 - **Library-Only Requirement**: Only requires the games to be in your Steam library; installation is not necessary.
 - **Automatic Pausing**: Automatically pauses when you start playing games on your main computer.
 - **Seamless Resumption**: Resumes automatically after you finish playing, as long as it can log in again.
-- **Single Account Use**: No need for multiple accounts.
+- **Multiple Accounts**: Supports farming on multiple steam accounts simultaneously.
 - **Inspired by**: [@Gunthersuper/steam-idle-bot](https://github.com/Gunthersuper/steam-idle-bot).
 
 
-## 🛠️ How to Use
+## How to Use
 
 ### 1. Prerequisites
 
-Ensure you have **Node.js** installed (minimum version 16). You can download it from the [official website](https://nodejs.org/).
+Ensure you have **Node.js v16 or higher** installed. You can download it from the [official website](https://nodejs.org/).
 
 ### 2. Installation
 
@@ -34,15 +32,17 @@ Create a directory where your Steam data will be stored:
 mkdir example-name/
 ```
 
-### 4. Find Game IDs
+### 4. Find Games App IDs
 
-To find your Steam game IDs:
+To find your Steam games App IDs:
 
 1. Open Steam and go to your **Library**.
 2. **Right-click** on a game you want to add to open the context menu.
-3. Select **"Properties"** from the menu.
-4. In the properties window, go to the **"Updates"** tab.
-5. Copy the **"App ID"** listed there.
+3. Select **Properties** from the menu.
+4. In the properties window, go to the **Updates** tab.
+5. Copy the **App ID** listed there.
+
+Alternatively, you can use [SteamDB](https://steamdb.info/) to look up the games App IDs.
 
 ### 5. Configuration
 
@@ -59,10 +59,10 @@ PERSONA="1"
 ACCOUNT_NAME="your_steam_username_2"
 PASSWORD="your_steam_password_2"
 GAMES="730,440"
-PERSONA="1"
+PERSONA="2"
 ```
 
-The `GAMES` variable should list the games you want the program to emulate playing, separated by commas. This example will start emulating playtime **CS2** and **Team Fortress 2**. You can also include non-Steam game names, like this:
+The `GAMES` variable should list the App IDs of the games you want the program to emulate playing, separated by commas. This example will start emulating playtime for **CS2** and **Team Fortress 2**. You can also include non-Steam game names, like this:
 
 ```sh
 GAMES="Hello World,730,440"
@@ -114,7 +114,7 @@ SHARED_SECRET="your_shared_secret"
 
 This will eliminate the need for manual Steam Guard code input and allow the program to reconnect automatically.
 
-## 🛡️ Running in the Background
+## Running in the Background
 
 To run the program in the background, you can choose from several methods:
 
@@ -134,8 +134,6 @@ To run the program in the background, you can choose from several methods:
     Type=simple
     WorkingDirectory=/home/my-user/example-name
     ExecStart=/usr/bin/steam-hour-farmer
-    Restart=always
-    RestartSec=5
 
     [Install]
     WantedBy=multi-user.target
