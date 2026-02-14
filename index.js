@@ -5,148 +5,202 @@ const readline = require("readline");
 const util = require("util");
 const Steam = require("steam-user");
 const TOTP = require("steam-totp");
+const fs = require("fs");
+const dotenv = require("dotenv");
 
 console.log(`Documentation: https://github.com/tacheometry/steam-hour-farmer`);
 
-require("dotenv").config();
-let { ACCOUNT_NAME, PASSWORD, PERSONA, GAMES, SHARED_SECRET } = process.env;
-{
-	PERSONA = parseInt(PERSONA);
-	const shouldExist = (name) => {
-		if (!process.env[name]) {
-			console.error(
-				`Environment variable "${name}" should be provided, but it is undefined.`
-			);
-			process.exit(1);
-		}
-	};
-
-	shouldExist("ACCOUNT_NAME");
-	shouldExist("PASSWORD");
-	shouldExist("GAMES");
-}
-
-const SHOULD_PLAY = GAMES.split(",").map((game) => {
-	const asNumber = parseInt(game);
-	// NaN
-	if (asNumber !== asNumber) return game;
-	return asNumber;
-});
-if (SHOULD_PLAY.length === 0)
-	console.warn("Could not find any games to play. Maybe this is a mistake?");
+const MIN_REQUEST_TIME = 60 * 1000;
+const CHECK_INTERVAL = 5 * 60 * 1000;
 
 const readlineInterface = readline.createInterface({
-	input: process.stdin,
-	output: process.stdout,
-});
-const consoleQuestion = util
-	.promisify(readlineInterface.question)
-	.bind(readlineInterface);
-
-const getTOTP = () => TOTP.generateAuthCode(SHARED_SECRET);
-
-const user = new Steam({
-	machineIdType: Steam.EMachineIDType.PersistentRandom,
-	dataDirectory: "SteamData",
-	renewRefreshTokens: true,
+    input: process.stdin,
+    output: process.stdout,
 });
 
-let playingOnOtherSession = false;
-let currentNotification;
-let authenticated = false;
-let MIN_REQUEST_TIME = 60 * 1000;
-let LOG_ON_INTERVAL = 10 * 60 * 1000;
-let REFRESH_GAMES_INTERVAL = 5 * 60 * 1000;
-let lastGameRefreshTime = new Date(0);
-let lastLogOnTime = new Date(0);
-let onlyLogInAfter = new Date(0);
+const consoleQuestion = util.promisify(readlineInterface.question).bind(readlineInterface);
 
-const logOn = () => {
-	if (authenticated) return;
-	if (Date.now() - lastLogOnTime <= MIN_REQUEST_TIME) return;
-	if (Date.now() < onlyLogInAfter) return;
-	console.log("Logging in...");
-	user.logOn({
-		accountName: ACCOUNT_NAME,
-		password: PASSWORD,
-		machineName: "steam-hour-farmer",
-		clientOS: Steam.EOSType.Windows10,
-		twoFactorCode: SHARED_SECRET
-			? TOTP.generateAuthCode(SHARED_SECRET)
-			: undefined,
-		autoRelogin: true,
-	});
-	lastLogOnTime = Date.now();
+let envContent;
+try {
+    envContent = fs.readFileSync(".env", "utf8");
+} catch (error) {
+    if (error.code === 'ENOENT') {
+        console.error("Error: .env file not found in the current directory.");
+        console.error("Please create a .env file with your Steam account details.");
+    } else {
+        console.error("Error reading .env file:", error.message);
+    }
+    process.exit(1);
+}
+
+const lines = envContent.split("\n");
+const accounts = [];
+let currentAccountLines = [];
+
+lines.forEach((line) => {
+    const trimmed = line.trim();
+    if (trimmed === "[STEAM_ACCOUNT]") {
+        if (currentAccountLines.length > 0) {
+            const accountEnv = currentAccountLines.join("\n");
+            const accountConfig = dotenv.parse(accountEnv);
+            accounts.push(accountConfig);
+            currentAccountLines = [];
+        }
+    } else {
+        currentAccountLines.push(line);
+    }
+});
+
+if (currentAccountLines.length > 0) {
+    const accountEnv = currentAccountLines.join("\n");
+    const accountConfig = dotenv.parse(accountEnv);
+    accounts.push(accountConfig);
+}
+
+const processedAccounts = accounts
+    .map((accountConfig) => {
+        const account = {
+            ACCOUNT_NAME: accountConfig.ACCOUNT_NAME,
+            PASSWORD: accountConfig.PASSWORD,
+            SHARED_SECRET: accountConfig.SHARED_SECRET || "",
+            GAMES: accountConfig.GAMES
+                ? accountConfig.GAMES.split(",").map((game) => {
+                      const asNumber = parseInt(game.trim());
+                      return isNaN(asNumber) ? game.trim() : asNumber;
+                  })
+                : [],
+            PERSONA: accountConfig.PERSONA ? parseInt(accountConfig.PERSONA) : undefined,
+        };
+
+        if (!account.ACCOUNT_NAME || !account.PASSWORD || account.GAMES.length === 0) {
+            console.error(
+                `Account missing required fields (ACCOUNT_NAME, PASSWORD, or GAMES) for "${account.ACCOUNT_NAME || "unknown"}". Skipping.`
+            );
+            return null;
+        }
+
+        return account;
+    })
+    .filter((account) => account !== null);
+
+if (processedAccounts.length === 0) {
+    console.error("No valid accounts found in .env file.");
+    process.exit(1);
+}
+
+const clients = processedAccounts.map((account) => ({
+    account,
+    user: new Steam({
+        machineIdType: Steam.EMachineIDType.PersistentRandom,
+        dataDirectory: `SteamData/${account.ACCOUNT_NAME}`,
+        renewRefreshTokens: true,
+    }),
+    authenticated: false,
+    playingOnOtherSession: false,
+    currentNotification: "",
+    lastLogOnTime: new Date(0),
+    onlyLogInAfter: new Date(0),
+}));
+
+const logOn = (client) => {
+    if (client.authenticated) return;
+    if (Date.now() - client.lastLogOnTime <= MIN_REQUEST_TIME) return;
+    if (Date.now() < client.onlyLogInAfter) return;
+
+    console.log(`Logging in for account "${client.account.ACCOUNT_NAME}"...`);
+    client.user.logOn({
+        accountName: client.account.ACCOUNT_NAME,
+        password: client.account.PASSWORD,
+        machineName: "steam-hour-farmer",
+        clientOS: Steam.EOSType.Windows11,
+        twoFactorCode: client.account.SHARED_SECRET
+            ? TOTP.generateAuthCode(client.account.SHARED_SECRET)
+            : undefined,
+        autoRelogin: true,
+    });
+    client.lastLogOnTime = Date.now();
 };
 
-const panic = (message = "Exiting...") => {
-	console.error(message);
-	process.exit(1);
+const refreshGames = (client) => {
+    if (!client.authenticated || client.playingOnOtherSession) return;
+
+    client.user.gamesPlayed(client.account.GAMES);
+    const notification = `Farming hours on ${client.account.GAMES.join(", ")} for "${client.account.ACCOUNT_NAME}"`;
+    if (client.currentNotification !== notification) {
+        client.currentNotification = notification;
+        console.log(notification);
+    }
 };
 
-const refreshGames = () => {
-	if (!authenticated) return;
-	let notification;
-	if (playingOnOtherSession) {
-		notification = "Farming is paused.";
-	} else {
-		if (Date.now() - lastGameRefreshTime <= MIN_REQUEST_TIME) return;
-		user.gamesPlayed(SHOULD_PLAY);
-		notification = "Farming...";
-		lastGameRefreshTime = Date.now();
-	}
-	if (currentNotification !== notification) {
-		currentNotification = notification;
-		console.log(notification);
-	}
-};
+clients.forEach((client) => {
+    client.user.on("steamGuard", async (domain, callback) => {
+        if (client.account.SHARED_SECRET) {
+            return callback(TOTP.generateAuthCode(client.account.SHARED_SECRET));
+        }
+        const code = await consoleQuestion(
+            `Enter Steam Guard code for "${client.account.ACCOUNT_NAME}"${domain ? ` (email: ${domain})` : ""}: `
+        );
+        callback(code.trim());
+    });
 
-user.on("steamGuard", async (domain, callback) => {
-	if (SHARED_SECRET) return callback(getTOTP());
-	const manualCode = await consoleQuestion(
-		`Enter Steam Guard code` +
-			(domain ? ` for email at ${domain}` : "") +
-			": "
-	);
-	callback(manualCode);
+    client.user.on("playingState", (blocked, playingApp) => {
+        if (client.playingOnOtherSession !== blocked) {
+            client.playingOnOtherSession = blocked;
+            if (!blocked) {
+                console.log(`Play block cleared for "${client.account.ACCOUNT_NAME}". Resuming farming...`);
+            }
+        }
+        refreshGames(client);
+    });
+
+    client.user.on("loggedOn", () => {
+        client.authenticated = true;
+        client.playingOnOtherSession = false;
+        console.log(`Logged in successfully: "${client.account.ACCOUNT_NAME}" (ID: ${client.user.steamID})`);
+
+        if (client.account.PERSONA !== undefined) {
+            client.user.setPersona(client.account.PERSONA);
+        }
+        refreshGames(client);
+    });
+
+    client.user.on("disconnected", (eresult, msg) => {
+        client.authenticated = false;
+        console.log(`Disconnected from Steam for "${client.account.ACCOUNT_NAME}" (${msg || eresult})`);
+    });
+
+    client.user.on("error", (err) => {
+        client.authenticated = false;
+
+        switch (err.eresult) {
+            case Steam.EResult.LoggedInElsewhere:
+                console.log(`Kicked: Another session is using "${client.account.ACCOUNT_NAME}". Waiting for it to free up...`);
+                break;
+
+            case Steam.EResult.RateLimitExceeded:
+                client.onlyLogInAfter = Date.now() + 30 * 60 * 1000;
+                console.log(`Rate limited for "${client.account.ACCOUNT_NAME}". Retrying in 30 minutes.`);
+                break;
+
+            default:
+                client.onlyLogInAfter = Date.now() + 10 * 60 * 1000;
+                console.error(`Error for "${client.account.ACCOUNT_NAME}": ${err.message} (${err.eresult}). Retrying in 10 minutes.`);
+                break;
+        }
+    });
 });
 
-user.on("playingState", (blocked, app) => {
-	playingOnOtherSession = blocked;
-	refreshGames();
-});
+setInterval(() => {
+    clients.forEach((client) => {
+        if (!client.authenticated) {
+            logOn(client);
+        }
+        if (client.authenticated && !client.playingOnOtherSession) {
+            refreshGames(client);
+        }
+    });
+}, CHECK_INTERVAL);
 
-user.on("loggedOn", () => {
-	authenticated = true;
-	console.log(`Successfully logged in to Steam with ID ${user.steamID}`);
-	if (PERSONA !== undefined) user.setPersona(PERSONA);
-	refreshGames();
+clients.forEach((client) => {
+    logOn(client);
 });
-
-user.on("error", (e) => {
-	switch (e.eresult) {
-		case Steam.EResult.LoggedInElsewhere: {
-			authenticated = false;
-			console.log(
-				"Got kicked by other Steam session. Will log in shortly..."
-			);
-			logOn();
-			return;
-		}
-		case Steam.EResult.RateLimitExceeded: {
-			authenticated = false;
-			onlyLogInAfter = Date.now() + 31 * 60 * 1000;
-			console.log(
-				"Got rate limited by Steam. Will try logging in again in 30 minutes."
-			);
-			return;
-		}
-		default: {
-			panic(`Got an error from Steam: "${e.message}".`);
-		}
-	}
-});
-
-logOn();
-setInterval(logOn, LOG_ON_INTERVAL);
-setInterval(refreshGames, REFRESH_GAMES_INTERVAL);
